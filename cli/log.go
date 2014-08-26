@@ -18,11 +18,12 @@ Stream log for a specific job.
 Options:
     -s, --split-stderr  send stderr lines to stderr
     -f, --follow        stream new lines after printing log buffer
+    -n <num>            limit log buffer to a certain number of lines
 `)
 }
 
 func runLog(args *docopt.Args, client *controller.Client) error {
-	rc, err := client.GetJobLog(mustApp(), args.String["<job>"], args.Bool["--follow"])
+	rc, err := client.GetJobLog(mustApp(), args.String["<job>"], args.Bool["--follow"], args.String["-n"])
 	if err != nil {
 		return err
 	}

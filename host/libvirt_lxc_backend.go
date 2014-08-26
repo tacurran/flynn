@@ -716,7 +716,7 @@ func (l *LibvirtLXCBackend) Attach(req *AttachRequest) (err error) {
 	log := l.openLog(req.Job.Job.ID)
 	if req.Logs {
 		ch := make(chan logbuf.Data)
-		go log.Read(0, ch)
+		go log.Read(req.Lines, ch)
 		if err := drain(ch); err != nil {
 			return err
 		}
