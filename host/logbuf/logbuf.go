@@ -127,11 +127,7 @@ func (l *Log) Follow(stream int, r io.Reader) error {
 
 // Write a log event to the logfile.
 func (l *Log) Write(data Data) error {
-	j := json.NewEncoder(l.l)
-	if err := j.Encode(data); err != nil {
-		return err
-	}
-	return nil
+	return json.NewEncoder(l.l).Encode(data)
 }
 
 // Read old log lines from a logfile.
@@ -193,7 +189,9 @@ func (l *Log) Read(lines uint, ch chan Data) error {
 		line, err := r.ReadBytes('\n')
 		if len(line) > 0 {
 			data := Data{}
-			json.Unmarshal(line, &data)
+			if err := json.Unmarshal(line, &data); err != nil {
+				return err
+			}
 			ch <- data
 		}
 		if err != io.EOF && err != nil {

@@ -111,9 +111,12 @@ func jobLog(req *http.Request, app *ct.App, params martini.Params, hc cluster.Ho
 		attachReq.Flags |= host.AttachFlagStream
 	}
 	if lines := req.FormValue("lines"); lines != "" {
-		if i, err := strconv.Atoi(lines); err == nil {
-			attachReq.Lines = uint(i)
+		i, err := strconv.Atoi(lines)
+		if err != nil {
+			w.WriteHeader(400)
+			return
 		}
+		attachReq.Lines = uint(i)
 	}
 	wait := req.FormValue("wait") != ""
 	attachClient, err := hc.Attach(attachReq, wait)

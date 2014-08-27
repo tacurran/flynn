@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -303,15 +304,14 @@ func (c *Client) GetApp(appID string) (*ct.App, error) {
 	return app, c.get(fmt.Sprintf("/apps/%s", appID), app)
 }
 
-func (c *Client) GetJobLog(appID, jobID string, tail bool, lines string) (io.ReadCloser, error) {
+func (c *Client) GetJobLog(appID, jobID string, tail bool, lines int) (io.ReadCloser, error) {
 	path := fmt.Sprintf("/apps/%s/jobs/%s/log", appID, jobID)
+	query := url.Values{}
 	if tail {
-		path += "?tail=true"
+		query.Add("tail", "true")
 	}
-	if lines != "" {
-		path += "?lines=" + lines
-	}
-	res, err := c.rawReq("GET", path, "", nil, nil)
+	query.Add("lines", strconv.Itoa(lines))
+	res, err := c.rawReq("GET", path+"?"+query.Encode(), "", nil, nil)
 	if err != nil {
 		return nil, err
 	}

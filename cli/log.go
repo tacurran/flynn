@@ -3,6 +3,7 @@ package main
 import (
 	"io"
 	"os"
+	"strconv"
 
 	"github.com/flynn/flynn/Godeps/_workspace/src/github.com/flynn/go-docopt"
 	"github.com/flynn/flynn/controller/client"
@@ -23,7 +24,11 @@ Options:
 }
 
 func runLog(args *docopt.Args, client *controller.Client) error {
-	rc, err := client.GetJobLog(mustApp(), args.String["<job>"], args.Bool["--follow"], args.String["-n"])
+	num, err := strconv.Atoi(args.String["-n"])
+	if err != nil {
+		num = 0
+	}
+	rc, err := client.GetJobLog(mustApp(), args.String["<job>"], args.Bool["--follow"], num)
 	if err != nil {
 		return err
 	}

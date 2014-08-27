@@ -685,28 +685,22 @@ func (l *LibvirtLXCBackend) Attach(req *AttachRequest) (err error) {
 	}
 
 	drain := func(ch chan logbuf.Data) error {
-		for {
-			data, ok := <-ch
-			if !ok {
-				return nil
-			}
+		for data := range ch {
+			var w io.Writer
 			switch data.Stream {
 			case 1:
-				if req.Stdout == nil {
-					continue
-				}
-				if _, err := req.Stdout.Write([]byte(data.Message)); err != nil {
-					return err
-				}
+				w = req.Stdout
 			case 2:
-				if req.Stderr == nil {
-					continue
-				}
-				if _, err := req.Stderr.Write([]byte(data.Message)); err != nil {
-					return err
-				}
+				w = req.Stderr
+			}
+			if w == nil {
+				continue
+			}
+			if _, err := w.Write([]byte(data.Message)); err != nil {
+				return err
 			}
 		}
+		return nil
 	}
 
 	if req.Attached != nil {
