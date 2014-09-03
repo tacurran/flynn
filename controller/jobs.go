@@ -16,6 +16,7 @@ import (
 	"github.com/flynn/flynn/Godeps/_workspace/src/github.com/flynn/pq"
 	"github.com/flynn/flynn/Godeps/_workspace/src/github.com/go-martini/martini"
 	ct "github.com/flynn/flynn/controller/types"
+	"github.com/flynn/flynn/controller/utils"
 	"github.com/flynn/flynn/host/types"
 	"github.com/flynn/flynn/pkg/cluster"
 )
@@ -28,8 +29,13 @@ func NewJobRepo(db *DB) *JobRepo {
 	return &JobRepo{db}
 }
 
+func (r *JobRepo) Get(id string) (*ct.Job, error) {
+	row := r.db.QueryRow("SELECT concat(host_id, '-', job_id), app_id, release_id, process_type, state, created_at, updated_at FROM job_cache WHERE concat(host_id, '-', job_id) = $1", id)
+	return scanJob(row)
+}
+
 func (r *JobRepo) Add(job *ct.Job) error {
-	hostID, jobID := parseJobID(job.ID)
+	hostID, jobID := utils.ParseJobID(job.ID)
 	if hostID == "" {
 		log.Printf("Unable to parse hostID from %q", job.ID)
 		return ErrNotFound
@@ -139,6 +145,15 @@ func listJobs(req *http.Request, w http.ResponseWriter, app *ct.App, repo *JobRe
 		return
 	}
 	r.JSON(200, list)
+}
+
+func getJob(params martini.Params, app *ct.App, repo *JobRepo, r ResponseHelper) {
+	job, err := repo.Get(params["jobs_id"])
+	if err != nil {
+		r.Error(err)
+		return
+	}
+	r.JSON(200, job)
 }
 
 func putJob(job ct.Job, app *ct.App, repo *JobRepo, r ResponseHelper) {
@@ -385,20 +400,12 @@ func (f flushWriter) Write(p []byte) (int, error) {
 	return f.w.Write(p)
 }
 
-func parseJobID(jobID string) (string, string) {
-	id := strings.SplitN(jobID, "-", 2)
-	if len(id) != 2 || id[0] == "" || id[1] == "" {
-		return "", ""
-	}
-	return id[0], id[1]
-}
-
 func formatUUID(s string) string {
 	return s[:8] + "-" + s[8:12] + "-" + s[12:16] + "-" + s[16:20] + "-" + s[20:]
 }
 
 func connectHostMiddleware(c martini.Context, params martini.Params, cl clusterClient, r ResponseHelper) {
-	hostID, jobID := parseJobID(params["jobs_id"])
+	hostID, jobID := utils.ParseJobID(params["jobs_id"])
 	if hostID == "" {
 		log.Printf("Unable to parse hostID from %q", params["jobs_id"])
 		r.Error(ErrNotFound)
