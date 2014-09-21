@@ -139,7 +139,7 @@ func (l *Log) Read(lines uint, follow bool, ch chan Data, done chan struct{}) er
 	t, err := tail.TailFile(name, tail.Config{
 		Follow: follow,
 		ReOpen: follow,
-		//logger: tail.DiscardingLogger,
+		Logger: tail.DiscardingLogger,
 		Location: &tail.SeekInfo{
 			Offset: seek,
 			Whence: os.SEEK_SET,
