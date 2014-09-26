@@ -1,0 +1,93 @@
+#!/bin/bash
+
+set -eo pipefail
+
+S3_URI="s3://flynn/ubuntu"
+
+usage() {
+  echo "usage: $0 COMMIT" >&2
+}
+
+cleanup() {
+  info "cleaning up"
+  if [[ -v dir ]]; then
+    rm -rf "${dir}"
+  fi
+}
+
+main() {
+  trap cleanup EXIT
+
+  if [[ $# -ne 1 ]]; then
+    usage
+    exit 1
+  fi
+
+  validate_env
+
+  local commit=$1
+  local root="$(cd "$(dirname "$0")/.." && pwd)"
+  local flynn_release="${root}/util/release/flynn-release"
+  local s3="s3cmd --access_key=$AWS_ACCESS_KEY_ID --secret_key=$AWS_SECRET_ACCESS_KEY"
+
+  info "checking commit status"
+  if ! "${flynn_release}" status $commit; then
+    fail "commit has not passed CI"
+  fi
+
+  local dir=$(mktemp -d)
+  info "created tmpdir ${dir}"
+
+  export GOPATH="${dir}/go"
+  local src="${GOPATH}/src/github.com/flynn/flynn"
+
+  info "cloning git repo"
+  git clone https://github.com/flynn/flynn "${src}"
+
+  info "building flynn"
+  pushd "${src}"
+  git checkout $commit
+  tup
+  popd
+
+  info "uploading images"
+  "${flynn_release}" upload "${src}/version.json"
+
+  info "building deb package"
+  "${root}/script/build-deb" -d "${src}"
+
+  info "downloading apt repo"
+  apt_dir="${dir}/apt"
+  mkdir -p "${apt_dir}/ubuntu"
+  $s3 sync $S3_URI "${apt_dir}"
+
+  info "signing deb package"
+  local deb=$(ls "${src}"/*.deb)
+  dpkg-sig --sign builder "${deb}"
+
+  info "adding deb to apt repo"
+  reprepro -b "${apt_dir}/ubuntu" --ask-passphrase includedeb flynn "${deb}"
+
+  info "uploading apt repo"
+  $s3 sync --acl-public --cf-invalidate --no-preserve "${apt_dir}/ubuntu/" $S3_URI/
+}
+
+info() {
+  local msg=$1
+  local timestamp=$(date +%H:%M:%S.%3N)
+  echo "===> $timestamp $msg"
+}
+
+fail() {
+  local msg=$1
+  info "ERROR: ${msg}" >&2
+  exit 1
+}
+
+validate_env() {
+  if [[ -z "${AWS_ACCESS_KEY_ID}" ]] || [[ -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
+    fail "missing AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY"
+  fi
+}
+
+main $@
