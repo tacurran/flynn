@@ -62,7 +62,7 @@ GEM
   specs:
     execjs (2.2.1)
     hike (1.2.3)
-    json (1.8.1)
+    json (2.5.1)
     mimetype-fu (0.1.2)
     multi_json (1.10.1)
     puma (2.9.0)
